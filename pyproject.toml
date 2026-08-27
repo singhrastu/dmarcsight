@@ -1,0 +1,16 @@
+[project]
+name = "dmarcsight"
+version = "0.1.0"
+description = "Audit a domain's email authentication posture: SPF, DKIM, DMARC, MTA-STS, TLS-RPT, BIMI"
+requires-python = ">=3.9"
+authors = [{name = "Rastu Singh"}]
+readme = "README.md"
+license = {text = "MIT"}
+dependencies = ["dnspython>=2.4"]
+
+[project.scripts]
+dmarcsight = "dmarcsight.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
