@@ -89,14 +89,15 @@ That one cost me a bug.
 Key-size estimates from the base64 `p=` blob are approximate. They are good enough to tell
 1024 from 2048, which is the distinction that matters.
 
-## TODO
+## Planned
 
-- parse DMARC aggregate (RUA) XML reports
-- DANE / TLSA
+- DANE and TLSA
 - ARC chain inspection
-- optional live SMTP probe to confirm STARTTLS behaviour matches the MTA-STS policy
+- An optional live SMTP probe, to confirm STARTTLS behaviour matches what the
+  MTA-STS policy promises
 
-MIT.
+Aggregate report parsing shipped separately, as the
+[DMARC report reader](https://rastu.tech/dmarc/).
 
 ## What it will not tell you
 
