@@ -13,9 +13,18 @@ from .report import FAIL, WARN, INFO, OK
 # selectors worth probing when we have no better information. Ordered roughly by
 # how often they turn up in the wild.
 COMMON_SELECTORS = [
-    "default", "google", "selector1", "selector2", "k1", "k2", "s1", "s2",
-    "mail", "dkim", "smtp", "mandrill", "mailjet", "sendgrid", "zoho",
-    "everlytickey1", "pm", "fd", "key1", "mte1", "sig1", "hs1",
+    # Microsoft, Google
+    "selector1", "selector2", "google",
+    # Proton and Fastmail publish fixed selectors via CNAME and are large enough
+    # that omitting them means reporting "no DKIM found" for a correctly
+    # configured domain, which is the worst kind of wrong answer this tool can
+    # give: confident, and about the thing the user came to check.
+    "protonmail", "protonmail2", "protonmail3", "fm1", "fm2", "fm3",
+    # ESPs
+    "k1", "k2", "s1", "s2", "mandrill", "mailjet", "sendgrid", "smtpapi",
+    "zoho", "everlytickey1", "pm", "mte1", "sig1", "hs1", "hs2", "ctct1",
+    # generic
+    "default", "mail", "dkim", "dkim1", "dkim2", "smtp", "fd", "key1", "key2",
 ]
 
 # SPF mechanisms that each cost a DNS lookup. RFC 7208 caps the total at 10 and
