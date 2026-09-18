@@ -55,6 +55,24 @@ def test_include_loop_does_not_hang():
     assert findings(rep, "SPF")
 
 
+def test_qualified_and_cidr_mechanisms_still_cost_a_lookup():
+    # +include, -a, ~mx, a/24, mx//64 and ptr:domain are all legal SPF and all
+    # cost a lookup. Matching on bare "a:"/"a" silently counted them as free,
+    # which reported a permerroring record as comfortably inside the limit.
+    rec = ("v=spf1 +include:i1.test -a ~mx ?exists:e.test a/24 mx//64 "
+           "ptr:p.test ip4:1.2.3.4 -all")
+    rep = run(txt={"example.com": [rec], "i1.test": ["v=spf1 ip4:10.0.0.1 -all"]})
+    counted = [f for f in findings(rep, "SPF") if "DNS lookups" in f or "lookup limit" in f]
+    assert counted, counted
+    # 7 lookups: include, a, mx, exists, a/24, mx//64, ptr
+    assert "about 7 of 10" in counted[0], counted[0]
+
+
+def test_ip4_and_all_are_free():
+    rep = run(txt={"example.com": ["v=spf1 ip4:1.2.3.4 ip6:::1 -all"]})
+    assert any("about 0 of 10" in f for f in findings(rep, "SPF"))
+
+
 # --- DMARC -----------------------------------------------------------------
 def test_missing_dmarc_is_a_failure():
     assert FAIL in sev(run(), "DMARC")

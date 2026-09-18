@@ -111,25 +111,50 @@ def check_spf(domain, r, rep):
                 "ptr is deprecated by RFC 7208 and some receivers ignore it. Remove it.")
 
 
+# RFC 7208 section 4.6.4: include, a, mx, ptr and exists each cost one DNS lookup,
+# as does the redirect modifier. all, ip4, ip6 and exp cost nothing.
+#
+# Every mechanism may carry a qualifier (+ - ~ ?) and a and mx may carry a CIDR
+# suffix (a/24, mx//64). Matching on bare "a:" and "a" misses "+a", "-a", "a/24"
+# and "ptr:example.com", all of which are legal and all of which cost a lookup.
+# Undercounting here means telling someone their record is safe when it permerrors.
+_QUALIFIER = "+-~?"
+_COSTS_A_LOOKUP = re.compile(r"^(include|a|mx|ptr|exists)(?:[:/]|$)", re.I)
+
+
+def _mechanism(token):
+    """(name, target) for a token, with the qualifier stripped. None if it is not
+    a mechanism that costs a lookup."""
+    t = token[1:] if token[:1] in _QUALIFIER else token
+    low = t.lower()
+    if low.startswith("redirect="):
+        return "redirect", t.split("=", 1)[1].strip()
+    m = _COSTS_A_LOOKUP.match(low)
+    if not m:
+        return None
+    name = m.group(1)
+    rest = t[len(name):]
+    target = rest[1:].split("/")[0].strip() if rest[:1] == ":" else ""
+    return name, target
+
+
 def _count_lookups(domain, spf, r, seen, depth=0):
     """Approximate the RFC 7208 lookup count by walking includes/redirects."""
     if depth > 10:
         return 99
     n = 0
     for token in spf.split():
-        t = token.lower()
-        if t.startswith(("include:", "redirect=")):
-            n += 1
-            target = token.split(":", 1)[-1] if t.startswith("include:") else token.split("=", 1)[-1]
-            target = target.strip()
-            if target in seen:
-                continue
-            seen.add(target)
-            sub = [x for x in r.txt(target) if x.lower().startswith("v=spf1")]
-            if sub:
-                n += _count_lookups(target, sub[0], r, seen, depth + 1)
-        elif t.startswith(("a:", "mx:", "exists:")) or t in ("a", "mx", "ptr"):
-            n += 1
+        mech = _mechanism(token)
+        if mech is None:
+            continue
+        name, target = mech
+        n += 1
+        if name not in ("include", "redirect") or not target or target in seen:
+            continue
+        seen.add(target)
+        sub = [x for x in r.txt(target) if x.lower().startswith("v=spf1")]
+        if sub:
+            n += _count_lookups(target, sub[0], r, seen, depth + 1)
     return n
 
 

@@ -1,5 +1,9 @@
 # dmarcsight
 
+**[Run it in your browser](https://rastu.tech/check/)** &mdash; no install, nothing sent
+to a server. The hosted version is a JavaScript port of this package, checked against it
+on every build so the two cannot report different findings.
+
 Audits a domain's email authentication posture and tells you what is actually broken.
 
 ```
@@ -91,5 +95,42 @@ Key-size estimates from the base64 `p=` blob are approximate. They are good enou
 - DANE / TLSA
 - ARC chain inspection
 - optional live SMTP probe to confirm STARTTLS behaviour matches the MTA-STS policy
+
+MIT.
+
+## What it will not tell you
+
+- **That DKIM is absent.** Selectors are arbitrary strings chosen by the sender, so
+  probing a list of common ones and finding nothing proves nothing. A miss is reported
+  as inconclusive, never as absent, and any tool that publishes a "DKIM adoption" figure
+  derived that way is guessing.
+- **That a published record is correct.** DNS presence is not correctness. A record can
+  resolve perfectly and still authorise the wrong sources.
+- **That you are compliant.** Two of the Gmail and Yahoo bulk sender requirements,
+  one-click List-Unsubscribe and a complaint rate under 0.3%, are not visible from DNS.
+
+## Related
+
+- [DMARC report reader](https://rastu.tech/dmarc/) &mdash; read an aggregate rua report,
+  in the browser, without uploading it anywhere
+- [SPF lookup counter](https://rastu.tech/spf/) &mdash; the full include tree with a
+  running RFC 7208 lookup count
+- [smtpsift](https://github.com/singhrastu/smtpsift) &mdash; the bounce half: classify an
+  SMTP rejection into the action it needs
+- [The State of Email Authentication](https://rastu.tech/research/) &mdash; this tool run
+  across 100,000 domains, with the dataset published
+
+## Author
+
+**Rastu Singh** &mdash; Infrastructure Engineer working on email platforms, deliverability
+and email security, in Tallinn, Estonia. The checks here are the ones that turned out to
+matter while running production sending estates: the SPF lookup limit that breaks a record
+silently, and an MTA-STS policy that 404s behind a DNS record promising it.
+
+[rastu.tech](https://rastu.tech) &middot;
+[LinkedIn](https://www.linkedin.com/in/rastu) &middot;
+[ORCID 0009-0002-0526-3005](https://orcid.org/0009-0002-0526-3005)
+
+## Licence
 
 MIT.
