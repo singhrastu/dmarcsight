@@ -14,3 +14,10 @@ dmarcsight = "dmarcsight.cli:main"
 [build-system]
 requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
+
+[tool.pytest.ini_options]
+# So a clone runs its tests with nothing installed first. Without this, pytest
+# cannot import the package and every test errors during collection, which reads
+# like a broken test suite rather than a missing install step.
+pythonpath = ["."]
+testpaths = ["tests"]
