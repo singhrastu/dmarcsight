@@ -115,7 +115,9 @@ def check_spf(domain, r, rep):
     else:
         rep.add("SPF", OK, f"SPF uses about {count} of 10 DNS lookups")
 
-    if re.search(r"\bptr\b", spf):
+    # A mechanism, not a substring: "include:ptr.example.com" is not ptr usage.
+    uses_ptr = any((_mechanism(t) or (None,))[0] == "ptr" for t in spf.split())
+    if uses_ptr:
         rep.add("SPF", WARN, "SPF uses the ptr mechanism",
                 "ptr is deprecated by RFC 7208 and some receivers ignore it. Remove it.")
 
@@ -147,23 +149,41 @@ def _mechanism(token):
     return name, target
 
 
-def _count_lookups(domain, spf, r, seen, depth=0):
-    """Approximate the RFC 7208 lookup count by walking includes/redirects."""
-    if depth > 10:
-        return 99
+def _count_lookups(domain, spf, r, path, depth=0):
+    """Approximate the RFC 7208 lookup count by walking includes/redirects.
+
+    `path` is the include chain above this record, not every target ever seen. A
+    global set was wrong twice over: it made a domain that includes the same
+    provider from two branches cost one lookup instead of two, which is not what
+    a receiver does, and it was doing cycle detection's job badly. A cycle is a
+    property of the path.
+    """
     n = 0
+    # RFC 7208 section 6.1: a redirect modifier is ignored when the record also
+    # has an all mechanism. Counting it inflates the total and can report a
+    # record that passes as one that permerrors.
+    has_all = any((t[1:] if t[:1] in _QUALIFIER else t).lower() == "all"
+                  for t in spf.split())
     for token in spf.split():
         mech = _mechanism(token)
         if mech is None:
             continue
         name, target = mech
-        n += 1
-        if name not in ("include", "redirect") or not target or target in seen:
+        if name == "redirect" and has_all:
             continue
-        seen.add(target)
+        n += 1
+        if name not in ("include", "redirect") or not target:
+            continue
+        if target in path:
+            continue
+        # Past ten levels the record has already spent more than ten lookups, so
+        # the verdict cannot change. Stop walking rather than returning a magic
+        # number that the caller adds and reports as 110.
+        if depth >= 10:
+            continue
         sub = [x for x in r.txt(target) if x.lower().startswith("v=spf1")]
         if sub:
-            n += _count_lookups(target, sub[0], r, seen, depth + 1)
+            n += _count_lookups(target, sub[0], r, path | {target}, depth + 1)
     return n
 
 
@@ -246,6 +266,18 @@ def check_dkim(domain, r, rep, selectors=None):
         if not key:
             rep.add("DKIM", FAIL, f"Selector '{sel}' has an empty p= (revoked key)",
                     "An empty p= means the key is revoked. Remove the record or publish a real key.")
+            continue
+        # RFC 8463 keys are Ed25519 and 32 bytes, which is 44 base64 characters.
+        # Measuring one in RSA bits reports about 227 and fails a perfectly good
+        # record, so read k= before judging length.
+        if t.get("k", "rsa").lower() == "ed25519":
+            if len("".join(key.split())) >= 40:
+                rep.add("DKIM", OK, f"Selector '{sel}' publishes an Ed25519 key",
+                        "", "k=ed25519")
+            else:
+                rep.add("DKIM", FAIL, f"Selector '{sel}' Ed25519 key looks truncated",
+                        "An Ed25519 public key is 32 bytes, so 44 base64 characters. "
+                        "Republish it.")
             continue
         # rough bit estimate from the base64 length
         bits = int(len(key) * 6 / 8 * 8 / 1.16)
